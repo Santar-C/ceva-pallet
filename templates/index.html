@@ -132,10 +132,6 @@
                             <input type="hidden" name="quantity" value="0">
                         </div>
 
-                        <div class="mb-3">
-                            <label class="fw-bold text-muted small">หมายเหตุ (ถ้ามี)</label>
-                            <input type="text" class="form-control" name="note" placeholder="เช่น ส่งด่วน, ชำรุด...">
-                        </div>
                         <button type="submit" class="btn-ceva shadow-sm"><i class="bi bi-save me-2"></i>บันทึกข้อมูล</button>
                     </form>
                 </div>
@@ -157,7 +153,7 @@
                 <div class="card-body p-3">
                     <table id="historyTable" class="table table-hover align-middle w-100 small">
                         <thead class="table-light">
-                            <tr><th>เวลา</th><th>เอกสาร</th><th>ประเทศ</th><th>สถานะ</th><th>Base</th><th>Lid</th><th>Collar</th><th>หมายเหตุ</th><th>ผู้ทำ</th><th>พิมพ์</th>
+                            <tr><th>เวลา</th><th>เอกสาร</th><th>ประเทศ</th><th>สถานะ</th><th>Base</th><th>Lid</th><th>Collar</th><th>ผู้ทำ</th><th>พิมพ์</th>
                             {% if session.role == 'admin' %}<th>ลบ</th>{% endif %}</tr>
                         </thead>
                         <tbody>
@@ -170,7 +166,6 @@
                                 <td class="fw-bold">{{ item.base_qty }}</td>
                                 <td class="fw-bold">{{ item.lid_qty }}</td>
                                 <td class="fw-bold">{{ item.collar_qty }}</td>
-                                <td class="text-muted">{{ item.note or '-' }}</td>
                                 <td class="text-muted"><i class="bi bi-person me-1"></i>{{ item.user_name }}</td>
                                 <td><a href="{{ url_for('print_slip', doc_number=item.doc_number) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-circle"><i class="bi bi-printer-fill"></i></a></td>
                                 {% if session.role == 'admin' %}
