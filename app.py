@@ -1,7 +1,6 @@
 import os
 import io
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session
-import pandas as pd
 from datetime import datetime
 import qrcode
 import psycopg2
@@ -336,14 +335,31 @@ def generate_qr(text):
 def export_excel():
     if 'username' not in session: return redirect(url_for('login'))
     conn = get_db()
-    log_df = pd.read_sql_query("SELECT * FROM transactions ORDER BY timestamp DESC", conn)
-    conn.close()
-    log_df['tx_type'] = log_df['tx_type'].replace({'IN': 'รับเข้า', 'OUT': 'เบิกออก'})
-    log_df.rename(columns={'user_name': 'ผู้ทำรายการ', 'doc_number': 'เอกสาร',
-                            'country': 'ประเทศ', 'po_number': 'PO', 'quantity': 'Set'}, inplace=True)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM transactions ORDER BY timestamp DESC")
+    rows = dict_fetchall(cur)
+    cur.close(); conn.close()
+
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "รายการ"
+    headers = ['id', 'ประเภท', 'เอกสาร', 'ประเทศ', 'PO', 'Set', 'Base', 'Lid', 'Collar', 'ผู้ทำรายการ', 'เวลา']
+    ws.append(headers)
+    col_map = ['id', 'tx_type', 'doc_number', 'country', 'po_number', 'quantity', 'base_qty', 'lid_qty', 'collar_qty', 'user_name', 'timestamp']
+    for row in rows:
+        r = []
+        for k in col_map:
+            v = row.get(k, '')
+            if k == 'tx_type':
+                v = 'รับเข้า' if v == 'IN' else 'เบิกออก'
+            if k == 'timestamp' and v:
+                v = str(v)[:16]
+            r.append(v)
+        ws.append(r)
+
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        log_df.to_excel(writer, index=False)
+    wb.save(output)
     output.seek(0)
     return send_file(output,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
