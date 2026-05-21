@@ -416,6 +416,18 @@ def export_excel():
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True, download_name=f'CEVA_Pallet_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx')
 
+
+@app.route('/run-migrate-secret-ceva2024')
+def run_migration():
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS note TEXT DEFAULT ''")
+        cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS po_number INTEGER DEFAULT 0")
+        conn.commit(); cur.close(); conn.close()
+        return "<h2>✅ Migration สำเร็จ! ปิดหน้านี้แล้วกลับใช้งานได้เลย</h2>"
+    except Exception as e:
+        return f"<h2>❌ Error: {e}</h2>"
+
 with app.app_context():
     init_db()
 
