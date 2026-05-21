@@ -19,7 +19,16 @@ def get_db():
 
 def dict_fetchall(cursor):
     columns = [desc[0] for desc in cursor.description]
-    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    rows = []
+    for row in cursor.fetchall():
+        d = dict(zip(columns, row))
+        # แปลง datetime เป็น string ให้ Jinja2 ใช้ [:16] ได้
+        for k, v in d.items():
+            from datetime import datetime
+            if isinstance(v, datetime):
+                d[k] = v.strftime('%Y-%m-%d %H:%M:%S')
+        rows.append(d)
+    return rows
 
 def dict_fetchone(cursor):
     columns = [desc[0] for desc in cursor.description]
