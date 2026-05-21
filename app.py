@@ -51,7 +51,7 @@ def init_db():
         country TEXT NOT NULL, po_number INTEGER NOT NULL, quantity INTEGER NOT NULL,
         base_qty INTEGER NOT NULL DEFAULT 0, lid_qty INTEGER NOT NULL DEFAULT 0,
         collar_qty INTEGER NOT NULL DEFAULT 0, user_name TEXT DEFAULT 'Unknown',
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, note TEXT DEFAULT '')''')
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     cur.execute("CREATE TABLE IF NOT EXISTS master_countries (id SERIAL PRIMARY KEY, name TEXT UNIQUE)")
     cur.execute('''CREATE TABLE IF NOT EXISTS audit_log (
         id SERIAL PRIMARY KEY, action TEXT, detail TEXT,
@@ -253,7 +253,6 @@ def process_transaction():
         country    = request.form['country'].strip()
         po_number  = int(request.form.get('po_number', 0))
         quantity   = int(request.form.get('quantity', 0))
-        note       = request.form.get('note', '').strip()
         user_name  = session['username']
 
         if tx_type == 'IN':
@@ -279,9 +278,9 @@ def process_transaction():
 
         conn = get_db(); cur = conn.cursor()
         cur.execute("""INSERT INTO transactions
-            (tx_type,doc_number,country,po_number,quantity,base_qty,lid_qty,collar_qty,user_name,note)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-            (tx_type,doc_number,country,po_number,quantity,calc_base,calc_lid,calc_collar,user_name,note))
+            (tx_type,doc_number,country,po_number,quantity,base_qty,lid_qty,collar_qty,user_name)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (tx_type,doc_number,country,po_number,quantity,calc_base,calc_lid,calc_collar,user_name))
         conn.commit(); cur.close(); conn.close()
         log_audit('INSERT', f"{tx_type} Doc:{doc_number} B:{calc_base} L:{calc_lid} C:{calc_collar}", user_name)
         flash(f"บันทึก {'รับเข้า' if tx_type=='IN' else 'เบิกออก'} สำเร็จ!", "success")
