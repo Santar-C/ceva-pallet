@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ใบทำรายการ - {{ doc_number }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background: #555; display: flex; justify-content: center; padding: 20px; }
+        .slip-container { background: white; width: 100%; max-width: 800px; padding: 40px; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #001a4c; padding-bottom: 20px; margin-bottom: 20px; }
+        .logo { max-height: 60px; }
+        .title { color: #001a4c; text-align: right; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+        th { background-color: #f4f6f9; color: #001a4c; }
+        .qr-section { text-align: center; margin-top: 30px; border: 2px dashed #ccc; padding: 20px; }
+        .qr-section img { width: 150px; }
+        .signatures { display: flex; justify-content: space-around; margin-top: 50px; text-align: center; }
+        .sign-box { width: 200px; border-top: 1px solid #000; padding-top: 10px; }
+        
+        /* สั่งซ่อนปุ่มเวลาปริ้นท์ลงกระดาษจริง */
+        @media print {
+            body { background: white; padding: 0; }
+            .slip-container { box-shadow: none; max-width: 100%; }
+            .btn-print { display: none; }
+        }
+        .btn-print { display: block; width: 200px; margin: 0 auto 20px; padding: 15px; background: #e60000; color: white; border: none; font-size: 1.2rem; cursor: pointer; border-radius: 8px; font-family: 'Prompt'; }
+    </style>
+</head>
+<body>
+    <div>
+        <button class="btn-print" onclick="window.print()">🖨️ พิมพ์เอกสาร (Print)</button>
+        
+        <div class="slip-container">
+            <div class="header">
+                <img src="{{ url_for('static', filename='logo.png') }}" class="logo">
+                <div class="title">
+                    <h2>ใบทำรายการพาเลท (Pallet Slip)</h2>
+                    <p>รหัสเอกสารอ้างอิง: <strong>{{ doc_number }}</strong></p>
+                </div>
+            </div>
+            
+            <div class="info-row">
+                <div><strong>วันที่พิมพ์:</strong> {{ date }}</div>
+                <div><strong>ผู้พิมพ์/ผู้ทำรายการ:</strong> {{ user }}</div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ประเภท</th><th>ปลายทาง/ต้นทาง</th><th>PO Number</th><th>จำนวน (Set)</th>
+                        <th>Base</th><th>Lid</th><th>Collar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td><strong>{{ 'รับเข้า (IN)' if item.tx_type == 'IN' else 'เบิกออก (OUT)' }}</strong></td>
+                        <td>{{ item.country }}</td>
+                        <td>PO{{ item.po_number }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ item.base_qty }}</td>
+                        <td>{{ item.lid_qty }}</td>
+                        <td>{{ item.collar_qty }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="qr-section">
+                <p>สแกน QR Code เพื่อตรวจสอบเลขเอกสารนี้</p>
+                <img src="{{ url_for('generate_qr', text=doc_number) }}" alt="QR Code">
+                <p><strong>{{ doc_number }}</strong></p>
+            </div>
+
+            <div class="signatures">
+                <div class="sign-box">ผู้ทำรายการ (Issuer)</div>
+                <div class="sign-box">ผู้ตรวจสอบ (Checker)</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
