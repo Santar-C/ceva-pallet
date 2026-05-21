@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>แดชบอร์ดสถิติ | CEVA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root { --ceva-blue: #001a4c; --ceva-red: #e60000; --bg-gray: #f4f7fa; }
+        body { font-family: 'Prompt', sans-serif; background-color: var(--bg-gray); color: #333; overflow-x: hidden; }
+        .sidebar { width: 260px; height: 100vh; position: fixed; background-color: var(--ceva-blue); color: white; padding-top: 20px; z-index: 1000; transition: 0.3s;}
+        .main-content { margin-left: 260px; padding: 30px 40px; min-height: 100vh; }
+        .sidebar-logo { text-align: center; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-logo img { background: white; padding: 8px 12px; border-radius: 8px; width: 80%; transition: 0.3s;}
+        .sidebar-logo img:hover { transform: scale(1.05); }
+        .nav-link { color: rgba(255,255,255,0.7); padding: 15px 25px; font-weight: 500; transition: all 0.3s; }
+        .nav-link.active { color: white; background-color: var(--ceva-red); border-left: 4px solid white; }
+        .nav-link:hover { color: white; background-color: rgba(255,255,255,0.05); padding-left: 32px; }
+        .user-panel { position: absolute; bottom: 0; width: 100%; padding: 20px; background-color: rgba(0,0,0,0.2); }
+        
+        .ceva-card { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 25px; transition: 0.3s; }
+        .ceva-card:hover { transform: translateY(-6px); box-shadow: 0 12px 30px rgba(0,26,76,0.08); }
+        .card-header { background: white; border-bottom: 1px solid #edf2f9; padding: 20px 25px; font-weight: 600; font-size: 1.15rem; color: var(--ceva-blue); border-radius: 12px 12px 0 0; }
+        
+        .big-summary { text-align: center; padding: 35px; }
+        .big-val { font-size: 4.5rem; font-weight: 700; color: var(--ceva-blue); line-height: 1; margin: 15px 0; }
+        .border-right { border-right: 1px solid #edf2f9; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-logo"><img src="{{ url_for('static', filename='logo.png') }}"></div>
+        <div class="nav flex-column mt-3">
+            <a href="{{ url_for('index') }}" class="nav-link"><i class="bi bi-pencil-square me-2"></i> บันทึก & ประวัติ</a>
+            <a href="{{ url_for('dashboard') }}" class="nav-link active"><i class="bi bi-bar-chart-line-fill me-2"></i> สถิติ & กราฟ</a>
+            {% if session.role == 'admin' %}
+            <a href="{{ url_for('master_data') }}" class="nav-link"><i class="bi bi-database-fill-gear me-2"></i> ฐานข้อมูลหลัก</a>
+            <a href="{{ url_for('manage_users') }}" class="nav-link"><i class="bi bi-people-fill me-2"></i> จัดการผู้ใช้งาน</a>
+            {% endif %}
+        </div>
+        <div class="user-panel">
+            <div class="fw-bold d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-person-circle me-2"></i>{{ session.username }}</span>
+                <a href="{{ url_for('logout') }}" class="text-white"><i class="bi bi-box-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <h3 class="fw-bold text-dark mb-4"><i class="bi bi-graph-up-arrow me-2 text-danger"></i> ภาพรวมและสถิติ (Dashboard)</h3>
+
+        <div class="ceva-card mb-4">
+            <div class="card-header"><i class="bi bi-database-fill me-2"></i> สต็อกคงเหลือปัจจุบันแบบละเอียด</div>
+            <div class="card-body p-0">
+                <div class="row g-0">
+                    <div class="col-md-4 border-right">
+                        <div class="big-summary"><div class="text-muted fw-bold"><i class="bi bi-box-fill text-primary me-2"></i>Base</div><div class="big-val">{{ stock_data.total_base }}</div></div>
+                    </div>
+                    <div class="col-md-4 border-right">
+                        <div class="big-summary"><div class="text-muted fw-bold"><i class="bi bi-layers-fill text-danger me-2"></i>Lid</div><div class="big-val">{{ stock_data.total_lid }}</div></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="big-summary"><div class="text-muted fw-bold"><i class="bi bi-distribute-vertical text-dark me-2"></i>Collar</div><div class="big-val">{{ stock_data.total_collar }}</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ceva-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-bar-chart-fill me-2"></i> กราฟเปรียบเทียบ ยอดรับเข้า / เบิกออก</span>
+            </div>
+            <div class="card-body p-5" style="height: 480px;">
+                <canvas id="stockChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('stockChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Base (ฐาน)', 'Lid (ฝา)', 'Collar (คอ)'],
+                datasets: [
+                    { label: 'ยอดรับเข้าสะสม (IN)', data: [{{ stock_data.in_base }}, {{ stock_data.in_lid }}, {{ stock_data.in_collar }}], backgroundColor: '#001a4c', borderRadius: 8, barPercentage: 0.5 },
+                    { label: 'ยอดเบิกออกสะสม (OUT)', data: [{{ stock_data.out_base }}, {{ stock_data.out_lid }}, {{ stock_data.out_collar }}], backgroundColor: '#e60000', borderRadius: 8, barPercentage: 0.5 }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    </script>
+</body>
+</html>
