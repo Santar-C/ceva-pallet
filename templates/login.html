@@ -1,1 +1,51 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>เข้าสู่ระบบ | CEVA Logistics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #001a4c; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: white; border-radius: 20px; padding: 40px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); width: 100%; max-width: 400px; text-align: center; border-top: 8px solid #e60000; }
+        .form-control { border-radius: 10px; padding: 15px; font-size: 1.1rem; background-color: #f8f9fa; border: 1px solid #dee2e6; transition: 0.3s; }
+        .form-control:focus { border-color: #001a4c; box-shadow: 0 0 0 3px rgba(0, 26, 76, 0.1); background-color: white; }
+        .btn-login { background-color: #e60000; color: white; border-radius: 10px; padding: 12px; font-weight: bold; width: 100%; transition: all 0.2s; border: none; font-size: 1.1rem; margin-top: 10px; }
+        .btn-login:hover { background-color: #cc0000; color: white; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(230,0,0,0.3); }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="CEVA Logo" height="45" class="mb-4">
+        <h4 class="fw-bold text-dark mb-4">ระบบจัดการคลังพาเลท</h4>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-danger rounded shadow-sm text-start" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ message }}
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('login') }}" method="POST">
+            <div class="mb-3 text-start">
+                <label class="form-label text-muted small fw-bold ms-1">ชื่อผู้ใช้งาน (Username)</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-person-fill text-primary"></i></span>
+                    <input type="text" class="form-control border-start-0 ps-0" name="username" required autofocus>
+                </div>
+            </div>
+            <div class="mb-4 text-start">
+                <label class="form-label text-muted small fw-bold ms-1">รหัสผ่าน (Password)</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-key-fill text-danger"></i></span>
+                    <input type="password" class="form-control border-start-0 ps-0" name="password" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-login"><i class="bi bi-box-arrow-in-right me-2"></i> เข้าสู่ระบบ</button>
+        </form>
+    </div>
+</body>
+</html>
