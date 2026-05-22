@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8"><title>KPI Dashboard | CEVA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root{--ceva-blue:#001a4c;--ceva-red:#e60000;--bg-gray:#f4f7fa}
+        body{font-family:'Prompt',sans-serif;background:var(--bg-gray)}
+        .sidebar{width:260px;height:100vh;position:fixed;background:var(--ceva-blue);color:white;padding-top:20px;z-index:1000}
+        .main-content{margin-left:260px;padding:30px 40px;min-height:100vh}
+        .sidebar-logo{text-align:center;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.1)}
+        .sidebar-logo img{background:white;padding:8px 12px;border-radius:8px;width:80%}
+        .nav-link{color:rgba(255,255,255,0.7);padding:12px 25px;font-weight:500;transition:all 0.3s}
+        .nav-link.active{color:white;background:var(--ceva-red);border-left:4px solid white}
+        .nav-link:hover{color:white;background:rgba(255,255,255,0.05);padding-left:32px}
+        .user-panel{position:absolute;bottom:0;width:100%;padding:20px;background:rgba(0,0,0,0.2)}
+        .ceva-card{background:white;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.04);margin-bottom:25px}
+        .card-header{background:white;border-bottom:1px solid #edf2f9;padding:18px 25px;font-weight:600;color:var(--ceva-blue);border-radius:12px 12px 0 0}
+        .kpi-box{background:white;border-radius:12px;padding:24px;box-shadow:0 4px 15px rgba(0,0,0,0.04);text-align:center;border-top:4px solid var(--ceva-blue)}
+        .kpi-num{font-size:2.8rem;font-weight:700;color:var(--ceva-blue);line-height:1}
+        .kpi-label{color:#6b7280;font-size:0.85rem;font-weight:600;margin-top:8px}
+        .stock-bar{background:#e5e7eb;border-radius:8px;height:12px;overflow:hidden;margin-top:6px}
+        .stock-fill{height:100%;border-radius:8px;transition:width 0.8s}
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="sidebar-logo"><img src="{{ url_for('static', filename='logo.png') }}"></div>
+    <div class="nav flex-column mt-3">
+        <a href="{{ url_for('index') }}" class="nav-link"><i class="bi bi-pencil-square me-2"></i>บันทึก & ประวัติ</a>
+        <a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-bar-chart-line-fill me-2"></i>สถิติ & กราฟ</a>
+        <a href="{{ url_for('reports') }}" class="nav-link"><i class="bi bi-file-earmark-bar-graph me-2"></i>รายงานละเอียด</a>
+        <a href="{{ url_for('kpi') }}" class="nav-link active"><i class="bi bi-speedometer2 me-2"></i>KPI Dashboard</a>
+        {% if session.role == 'admin' %}
+        <a href="{{ url_for('import_excel') }}" class="nav-link"><i class="bi bi-file-earmark-arrow-up me-2"></i>Import Excel</a>
+        <a href="{{ url_for('master_data') }}" class="nav-link"><i class="bi bi-database-fill-gear me-2"></i>ฐานข้อมูลหลัก</a>
+        <a href="{{ url_for('manage_users') }}" class="nav-link"><i class="bi bi-people-fill me-2"></i>จัดการผู้ใช้งาน</a>
+        <a href="{{ url_for('admin_clear') }}" class="nav-link"><i class="bi bi-trash3-fill me-2"></i>ล้างข้อมูล</a>
+        <a href="{{ url_for('audit_log') }}" class="nav-link"><i class="bi bi-shield-check me-2"></i>Audit Log</a>
+        {% endif %}
+    </div>
+    <div class="user-panel">
+        <div class="fw-bold d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-person-circle me-2"></i>{{ session.username }}</span>
+            <a href="{{ url_for('logout') }}" class="text-white"><i class="bi bi-box-arrow-right"></i></a>
+        </div>
+    </div>
+</div>
+
+<div class="main-content">
+    <h3 class="fw-bold text-dark mb-4"><i class="bi bi-speedometer2 me-2 text-primary"></i>KPI Dashboard — ภาพรวมสำหรับผู้บริหาร</h3>
+
+    {% if alerts %}{% for a in alerts %}
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 15px;margin-bottom:15px">
+        <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+        <strong>⚠️ สต็อก {{ a.item }} ต่ำ!</strong> คงเหลือ <strong>{{ a.current }}</strong> ชิ้น
+    </div>{% endfor %}{% endif %}
+
+    <!-- KPI Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-2">
+            <div class="kpi-box">
+                <div class="kpi-num">{{ kpi.total_tx or 0 }}</div>
+                <div class="kpi-label"><i class="bi bi-list-check me-1"></i>รายการทั้งหมด</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="kpi-box" style="border-color:#198754">
+                <div class="kpi-num text-success">{{ kpi.total_in or 0 }}</div>
+                <div class="kpi-label"><i class="bi bi-box-arrow-in-down me-1"></i>รับเข้าทั้งหมด</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="kpi-box" style="border-color:var(--ceva-red)">
+                <div class="kpi-num text-danger">{{ kpi.total_out or 0 }}</div>
+                <div class="kpi-label"><i class="bi bi-box-arrow-up me-1"></i>เบิกออกทั้งหมด</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="kpi-box" style="border-color:#0ea5e9">
+                <div class="kpi-num" style="color:#0ea5e9">{{ kpi.this_month or 0 }}</div>
+                <div class="kpi-label"><i class="bi bi-calendar-month me-1"></i>รายการเดือนนี้</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="kpi-box" style="border-color:#8b5cf6">
+                <div class="kpi-num" style="color:#8b5cf6">{{ kpi.active_users or 0 }}</div>
+                <div class="kpi-label"><i class="bi bi-people me-1"></i>ผู้ใช้งาน</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="kpi-box" style="border-color:#f59e0b">
+                <div class="kpi-num" style="color:#f59e0b">{{ kpi.countries_served or 0 }}</div>
+                <div class="kpi-label"><i class="bi bi-globe me-1"></i>ประเทศที่ให้บริการ</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Stock Status -->
+        <div class="col-lg-4">
+            <div class="ceva-card">
+                <div class="card-header"><i class="bi bi-database-fill me-2"></i>สต็อกคงเหลือ</div>
+                <div class="card-body p-4">
+                    {% for name, val, color in [('Base', stock.total_base, '#001a4c'), ('Lid', stock.total_lid, '#e60000'), ('Collar', stock.total_collar, '#374151')] %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small fw-bold">
+                            <span>{{ name }}</span><span>{{ val }} ชิ้น</span>
+                        </div>
+                        <div class="stock-bar">
+                            <div class="stock-fill" style="width:{{ [val, 1000]|min / 10 }}%;background:{{ color }}"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <a href="{{ url_for('export_excel') }}" class="btn btn-success btn-sm w-100 mt-2">
+                        <i class="bi bi-file-earmark-excel me-1"></i>Export Excel ตอนนี้
+                    </a>
+                </div>
+            </div>
+
+            <!-- Top Users -->
+            <div class="ceva-card">
+                <div class="card-header"><i class="bi bi-person-badge me-2"></i>Top ผู้ใช้งาน</div>
+                <div class="card-body p-3">
+                    <table class="table table-sm align-middle mb-0">
+                        {% for u in top_users %}
+                        <tr>
+                            <td class="text-muted">{{ loop.index }}</td>
+                            <td><i class="bi bi-person-circle me-1"></i>{{ u.user_name }}</td>
+                            <td class="text-end fw-bold text-primary">{{ u.cnt }} รายการ</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Activity Chart -->
+        <div class="col-lg-8">
+            <div class="ceva-card h-100">
+                <div class="card-header"><i class="bi bi-activity me-2"></i>กิจกรรม 14 วันล่าสุด</div>
+                <div class="card-body p-4" style="height:400px"><canvas id="dailyChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+new Chart(document.getElementById('dailyChart'), {
+    type: 'bar',
+    data: {
+        labels: [{% for d in daily %}'{{ d.day[5:] }}'{% if not loop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+            label: 'จำนวนรายการ',
+            data: [{% for d in daily %}{{ d.cnt }}{% if not loop.last %},{% endif %}{% endfor %}],
+            backgroundColor: '#001a4c', borderRadius: 6
+        }]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+});
+</script>
+
+<script>
+(function() {
+    const TIMEOUT_MS = 30 * 60 * 1000;
+    let timer, warnTimer;
+    function resetTimer() {
+        clearTimeout(timer); clearTimeout(warnTimer);
+        warnTimer = setTimeout(() => {
+            if (confirm('คุณไม่ได้ใช้งาน 25 นาทีแล้ว ต้องการใช้งานต่อไหม?')) resetTimer();
+            else window.location.href = '/logout';
+        }, 25 * 60 * 1000);
+        timer = setTimeout(() => {
+            alert('หมดเวลาการใช้งาน กรุณา Login ใหม่');
+            window.location.href = '/logout';
+        }, TIMEOUT_MS);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(e =>
+        document.addEventListener(e, resetTimer, { passive: true }));
+    resetTimer();
+})();
+</script>
+</body>
+</html>
