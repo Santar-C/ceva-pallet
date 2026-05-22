@@ -276,11 +276,17 @@ def process_transaction():
                 flash(f"สต็อกไม่พอ: {', '.join(errors)}", "error")
                 return redirect(url_for('index'))
 
+        tx_date = request.form.get('tx_date', '')
+        try:
+            tx_timestamp = datetime.strptime(tx_date, '%Y-%m-%dT%H:%M') if tx_date else datetime.now()
+        except Exception:
+            tx_timestamp = datetime.now()
+
         conn = get_db(); cur = conn.cursor()
         cur.execute("""INSERT INTO transactions
-            (tx_type,doc_number,country,po_number,quantity,base_qty,lid_qty,collar_qty,user_name)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-            (tx_type,doc_number,country,po_number,quantity,calc_base,calc_lid,calc_collar,user_name))
+            (tx_type,doc_number,country,po_number,quantity,base_qty,lid_qty,collar_qty,user_name,timestamp)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (tx_type,doc_number,country,po_number,quantity,calc_base,calc_lid,calc_collar,user_name,tx_timestamp))
         conn.commit(); cur.close(); conn.close()
         log_audit('INSERT', f"{tx_type} Doc:{doc_number} B:{calc_base} L:{calc_lid} C:{calc_collar}", user_name)
         flash(f"บันทึก {'รับเข้า' if tx_type=='IN' else 'เบิกออก'} สำเร็จ!", "success")
@@ -368,6 +374,47 @@ def audit_log():
     cur.execute("SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT 200")
     logs = dict_fetchall(cur); cur.close(); conn.close()
     return render_template('audit_log.html', logs=logs)
+
+
+# ==================== EDIT TRANSACTION (Admin) ====================
+@app.route('/edit/<int:tx_id>', methods=['GET', 'POST'])
+def edit_tx(tx_id):
+    if 'username' not in session: return redirect(url_for('login'))
+    if session.get('role') != 'admin': flash("เฉพาะ Admin!", "error"); return redirect(url_for('index'))
+    conn = get_db(); cur = conn.cursor()
+    if request.method == 'POST':
+        tx_type    = request.form['tx_type']
+        doc_number = request.form['doc_number'].strip().upper()
+        country    = request.form['country'].strip()
+        po_number  = int(request.form.get('po_number', 0))
+        quantity   = int(request.form.get('quantity', 0))
+        base_qty   = int(request.form.get('base_qty', 0))
+        lid_qty    = int(request.form.get('lid_qty', 0))
+        collar_qty = int(request.form.get('collar_qty', 0))
+        tx_date    = request.form.get('tx_date', '')
+        try:
+            tx_timestamp = datetime.strptime(tx_date, '%Y-%m-%dT%H:%M') if tx_date else datetime.now()
+        except Exception:
+            tx_timestamp = datetime.now()
+        cur.execute("""UPDATE transactions SET
+            tx_type=%s, doc_number=%s, country=%s, po_number=%s, quantity=%s,
+            base_qty=%s, lid_qty=%s, collar_qty=%s, timestamp=%s
+            WHERE id=%s""",
+            (tx_type, doc_number, country, po_number, quantity,
+             base_qty, lid_qty, collar_qty, tx_timestamp, tx_id))
+        conn.commit()
+        log_audit('EDIT', f"Edited ID:{tx_id} Doc:{doc_number}", session['username'])
+        flash(f"แก้ไขรายการ {doc_number} สำเร็จ!", "success")
+        cur.close(); conn.close()
+        return redirect(url_for('index'))
+    # GET
+    cur.execute("SELECT * FROM transactions WHERE id = %s", (tx_id,))
+    tx = dict_fetchone(cur)
+    cur.execute("SELECT name FROM master_countries ORDER BY name")
+    countries = dict_fetchall(cur)
+    cur.close(); conn.close()
+    if not tx: return "ไม่พบรายการ", 404
+    return render_template('edit_tx.html', tx=tx, countries=countries)
 
 # ==================== PRINT / QR ====================
 @app.route('/print_slip/<doc_number>')
