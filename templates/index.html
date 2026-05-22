@@ -94,6 +94,10 @@
                             </select>
                         </div>
                         <div class="mb-3">
+                            <label class="fw-bold text-muted small">วันที่ทำรายการ</label>
+                            <input type="datetime-local" class="form-control" name="tx_date" id="txDate" required>
+                        </div>
+                        <div class="mb-3">
                             <label class="fw-bold text-muted small">เลขเอกสาร</label>
                             <input type="text" class="form-control" name="doc_number" required autofocus>
                         </div>
@@ -108,31 +112,51 @@
                         <!-- IN fields -->
                         <div id="inFields">
                             <div class="row g-2 mb-2">
-                                <div class="col-6"><label class="fw-bold text-muted small">PO</label><input type="number" class="form-control" name="po_number" min="1" value="1"></div>
-                                <div class="col-6"><label class="fw-bold text-muted small">จำนวน Set</label><input type="number" class="form-control" name="quantity" min="1" value="1"></div>
+                                <div class="col-6"><label class="fw-bold text-muted small">PO</label><input type="number" class="form-control" name="po_number" id="po_in" min="1" value="1" oninput="calcIN()"></div>
+                                <div class="col-6"><label class="fw-bold text-muted small">จำนวน Set</label><input type="number" class="form-control" name="quantity" id="qty_in" min="1" value="1" oninput="calcIN()"></div>
                             </div>
-                            <div class="alert alert-info p-2 small mb-3">Base=1×Set, Lid=1×Set, Collar=PO×Set</div>
+                            <div class="alert alert-info p-2 small mb-2" id="inPreview">Base=1, Lid=1, Collar=1</div>
                         </div>
 
                         <!-- OUT fields -->
                         <div id="outFields">
                             <div class="mb-2">
-                                <label class="fw-bold text-muted small">Base (ฐาน) <span class="text-primary">คงเหลือ {{ stock_data.total_base }}</span></label>
-                                <input type="number" class="form-control" name="base_qty" min="0" value="0">
+                                <label class="fw-bold text-muted small">โหมดเบิกออก</label>
+                                <select class="form-select form-select-sm" id="outMode" onchange="toggleOutMode(this.value)">
+                                    <option value="manual">✏️ กรอกแยกอิสระ</option>
+                                    <option value="po">📦 คำนวณจาก PO</option>
+                                </select>
                             </div>
-                            <div class="mb-2">
-                                <label class="fw-bold text-muted small">Lid (ฝา) <span class="text-danger">คงเหลือ {{ stock_data.total_lid }}</span></label>
-                                <input type="number" class="form-control" name="lid_qty" min="0" value="0">
+
+                            <!-- Manual mode -->
+                            <div id="manualOut">
+                                <div class="form-check mb-1"><input class="form-check-input" type="checkbox" id="chkBase" checked onchange="toggleItem('base')"><label class="form-check-label fw-bold small">Base <span class="text-primary">(คงเหลือ {{ stock_data.total_base }})</span></label></div>
+                                <input type="number" class="form-control form-control-sm mb-2" name="base_qty" id="base_qty" min="0" value="0">
+
+                                <div class="form-check mb-1"><input class="form-check-input" type="checkbox" id="chkLid" checked onchange="toggleItem('lid')"><label class="form-check-label fw-bold small">Lid <span class="text-danger">(คงเหลือ {{ stock_data.total_lid }})</span></label></div>
+                                <input type="number" class="form-control form-control-sm mb-2" name="lid_qty" id="lid_qty" min="0" value="0">
+
+                                <div class="form-check mb-1"><input class="form-check-input" type="checkbox" id="chkCollar" checked onchange="toggleItem('collar')"><label class="form-check-label fw-bold small">Collar <span class="text-dark">(คงเหลือ {{ stock_data.total_collar }})</span></label></div>
+                                <input type="number" class="form-control form-control-sm mb-2" name="collar_qty" id="collar_qty" min="0" value="0">
                             </div>
-                            <div class="mb-3">
-                                <label class="fw-bold text-muted small">Collar (คอ) <span class="text-dark">คงเหลือ {{ stock_data.total_collar }}</span></label>
-                                <input type="number" class="form-control" name="collar_qty" min="0" value="0">
+
+                            <!-- PO mode -->
+                            <div id="poOut" style="display:none">
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6"><label class="fw-bold text-muted small">PO</label><input type="number" class="form-control" id="po_out" min="1" value="1" oninput="calcOUT()"></div>
+                                    <div class="col-6"><label class="fw-bold text-muted small">จำนวน Set</label><input type="number" class="form-control" id="qty_out" min="1" value="1" oninput="calcOUT()"></div>
+                                </div>
+                                <div class="alert alert-warning p-2 small" id="outPreview">Base=1, Lid=1, Collar=1</div>
+                                <input type="hidden" name="base_qty" id="base_po">
+                                <input type="hidden" name="lid_qty" id="lid_po">
+                                <input type="hidden" name="collar_qty" id="collar_po">
                             </div>
+
                             <input type="hidden" name="po_number" value="0">
                             <input type="hidden" name="quantity" value="0">
                         </div>
 
-                        <button type="submit" class="btn-ceva shadow-sm"><i class="bi bi-save me-2"></i>บันทึกข้อมูล</button>
+                        <button type="submit" class="btn-ceva shadow-sm mt-2"><i class="bi bi-save me-2"></i>บันทึกข้อมูล</button>
                     </form>
                 </div>
             </div>
@@ -154,7 +178,7 @@
                     <table id="historyTable" class="table table-hover align-middle w-100 small">
                         <thead class="table-light">
                             <tr><th>เวลา</th><th>เอกสาร</th><th>ประเทศ</th><th>สถานะ</th><th>Base</th><th>Lid</th><th>Collar</th><th>ผู้ทำ</th><th>พิมพ์</th>
-                            {% if session.role == 'admin' %}<th>ลบ</th>{% endif %}</tr>
+                            {% if session.role == 'admin' %}<th>แก้ไข</th><th>ลบ</th>{% endif %}</tr>
                         </thead>
                         <tbody>
                             {% for item in log_rows %}
@@ -169,6 +193,7 @@
                                 <td class="text-muted"><i class="bi bi-person me-1"></i>{{ item.user_name }}</td>
                                 <td><a href="{{ url_for('print_slip', doc_number=item.doc_number) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-circle"><i class="bi bi-printer-fill"></i></a></td>
                                 {% if session.role == 'admin' %}
+                                <td><a href="{{ url_for('edit_tx', tx_id=item.id) }}" class="btn btn-sm btn-outline-warning rounded-circle" title="แก้ไข"><i class="bi bi-pencil-fill"></i></a></td>
                                 <td><a href="{{ url_for('delete_tx', tx_id=item.id) }}" class="text-danger fs-5" onclick="return confirm('ลบรายการนี้?')"><i class="bi bi-trash3-fill"></i></a></td>
                                 {% endif %}
                             </tr>
@@ -191,10 +216,61 @@ $(document).ready(function(){
         language:{search:"🔍 ค้นหา:",lengthMenu:"แสดง _MENU_ แถว",info:"แสดง _START_-_END_ จาก _TOTAL_ รายการ",paginate:{next:"ถัดไป",previous:"ก่อนหน้า"}}
     });
 });
+// Set default datetime to now
+document.getElementById('txDate').value = new Date(new Date().getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
+
 function toggleFields(val){
-    if(val==='OUT'){document.getElementById('inFields').style.display='none';document.getElementById('outFields').style.display='block';}
-    else{document.getElementById('inFields').style.display='block';document.getElementById('outFields').style.display='none';}
+    if(val==='OUT'){
+        document.getElementById('inFields').style.display='none';
+        document.getElementById('outFields').style.display='block';
+    } else {
+        document.getElementById('inFields').style.display='block';
+        document.getElementById('outFields').style.display='none';
+    }
 }
+function calcIN(){
+    var po=parseInt(document.getElementById('po_in').value)||1;
+    var qty=parseInt(document.getElementById('qty_in').value)||1;
+    document.getElementById('inPreview').innerHTML='<b>Base='+qty+', Lid='+qty+', Collar='+(po*qty)+'</b>';
+}
+function calcOUT(){
+    var po=parseInt(document.getElementById('po_out').value)||1;
+    var qty=parseInt(document.getElementById('qty_out').value)||1;
+    document.getElementById('base_po').value=qty;
+    document.getElementById('lid_po').value=qty;
+    document.getElementById('collar_po').value=po*qty;
+    document.getElementById('outPreview').innerHTML='<b>Base='+qty+', Lid='+qty+', Collar='+(po*qty)+'</b>';
+}
+function toggleOutMode(mode){
+    if(mode==='po'){
+        document.getElementById('manualOut').style.display='none';
+        document.getElementById('poOut').style.display='block';
+        // remove manual hidden inputs conflict
+        document.getElementById('base_qty').name='';
+        document.getElementById('lid_qty').name='';
+        document.getElementById('collar_qty').name='';
+        document.getElementById('base_po').name='base_qty';
+        document.getElementById('lid_po').name='lid_qty';
+        document.getElementById('collar_po').name='collar_qty';
+        calcOUT();
+    } else {
+        document.getElementById('manualOut').style.display='block';
+        document.getElementById('poOut').style.display='none';
+        document.getElementById('base_qty').name='base_qty';
+        document.getElementById('lid_qty').name='lid_qty';
+        document.getElementById('collar_qty').name='collar_qty';
+        document.getElementById('base_po').name='';
+        document.getElementById('lid_po').name='';
+        document.getElementById('collar_po').name='';
+    }
+}
+function toggleItem(item){
+    var chk=document.getElementById('chk'+item.charAt(0).toUpperCase()+item.slice(1));
+    var inp=document.getElementById(item+'_qty');
+    if(!chk.checked){inp.value=0;inp.disabled=true;}
+    else{inp.disabled=false;}
+}
+calcIN();
 </script>
 </body>
 </html>
