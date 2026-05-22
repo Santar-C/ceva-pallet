@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8"><title>รายงาน | CEVA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root{--ceva-blue:#001a4c;--ceva-red:#e60000;--bg-gray:#f4f7fa}
+        body{font-family:'Prompt',sans-serif;background:var(--bg-gray)}
+        .sidebar{width:260px;height:100vh;position:fixed;background:var(--ceva-blue);color:white;padding-top:20px;z-index:1000}
+        .main-content{margin-left:260px;padding:30px 40px;min-height:100vh}
+        .sidebar-logo{text-align:center;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.1)}
+        .sidebar-logo img{background:white;padding:8px 12px;border-radius:8px;width:80%}
+        .nav-link{color:rgba(255,255,255,0.7);padding:12px 25px;font-weight:500;transition:all 0.3s}
+        .nav-link.active{color:white;background:var(--ceva-red);border-left:4px solid white}
+        .nav-link:hover{color:white;background:rgba(255,255,255,0.05);padding-left:32px}
+        .user-panel{position:absolute;bottom:0;width:100%;padding:20px;background:rgba(0,0,0,0.2)}
+        .ceva-card{background:white;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.04);margin-bottom:25px}
+        .card-header{background:white;border-bottom:1px solid #edf2f9;padding:18px 25px;font-weight:600;color:var(--ceva-blue);border-radius:12px 12px 0 0}
+        .stat-pill{background:#f0f4ff;border-radius:10px;padding:12px 20px;text-align:center}
+        .stat-num{font-size:2rem;font-weight:700;color:var(--ceva-blue)}
+        .forecast-box{border-radius:10px;padding:18px;text-align:center}
+        .forecast-ok{background:#d1fae5;color:#065f46}
+        .forecast-warn{background:#fef3c7;color:#92400e}
+        .forecast-danger{background:#fee2e2;color:#991b1b}
+        .trend-up{color:#dc2626;font-weight:600}
+        .trend-down{color:#16a34a;font-weight:600}
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="sidebar-logo"><img src="{{ url_for('static', filename='logo.png') }}"></div>
+    <div class="nav flex-column mt-3">
+        <a href="{{ url_for('index') }}" class="nav-link"><i class="bi bi-pencil-square me-2"></i>บันทึก & ประวัติ</a>
+        <a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-bar-chart-line-fill me-2"></i>สถิติ & กราฟ</a>
+        <a href="{{ url_for('reports') }}" class="nav-link active"><i class="bi bi-file-earmark-bar-graph me-2"></i>รายงานละเอียด</a>
+        <a href="{{ url_for('kpi') }}" class="nav-link"><i class="bi bi-speedometer2 me-2"></i>KPI Dashboard</a>
+        {% if session.role == 'admin' %}
+        <a href="{{ url_for('import_excel') }}" class="nav-link"><i class="bi bi-file-earmark-arrow-up me-2"></i>Import Excel</a>
+        <a href="{{ url_for('master_data') }}" class="nav-link"><i class="bi bi-database-fill-gear me-2"></i>ฐานข้อมูลหลัก</a>
+        <a href="{{ url_for('manage_users') }}" class="nav-link"><i class="bi bi-people-fill me-2"></i>จัดการผู้ใช้งาน</a>
+        <a href="{{ url_for('admin_clear') }}" class="nav-link"><i class="bi bi-trash3-fill me-2"></i>ล้างข้อมูล</a>
+        <a href="{{ url_for('audit_log') }}" class="nav-link"><i class="bi bi-shield-check me-2"></i>Audit Log</a>
+        {% endif %}
+    </div>
+    <div class="user-panel">
+        <div class="fw-bold d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-person-circle me-2"></i>{{ session.username }}</span>
+            <a href="{{ url_for('logout') }}" class="text-white"><i class="bi bi-box-arrow-right"></i></a>
+        </div>
+    </div>
+</div>
+
+<div class="main-content">
+    <h3 class="fw-bold text-dark mb-4"><i class="bi bi-file-earmark-bar-graph me-2 text-primary"></i>รายงานละเอียด & Forecast</h3>
+
+    <!-- Forecast -->
+    <div class="ceva-card">
+        <div class="card-header"><i class="bi bi-graph-up me-2"></i>Forecast — คาดการณ์สต็อกจะหมดใน</div>
+        <div class="card-body p-4">
+            <div class="row g-3 mb-4">
+                {% set items = [
+                    ('Base', forecast.base_days, stock.total_base, forecast.avg30.avg_base),
+                    ('Lid', forecast.lid_days, stock.total_lid, forecast.avg30.avg_lid),
+                    ('Collar', forecast.collar_days, stock.total_collar, forecast.avg30.avg_collar)
+                ] %}
+                {% for name, days, cur_stock, avg in items %}
+                <div class="col-md-4">
+                    <div class="forecast-box {% if days < 7 %}forecast-danger{% elif days < 30 %}forecast-warn{% else %}forecast-ok{% endif %}">
+                        <div class="fw-bold fs-5">{{ name }}</div>
+                        <div style="font-size:2.5rem;font-weight:700">
+                            {% if days >= 999 %}∞{% else %}{{ days }}{% endif %}
+                        </div>
+                        <div class="small">วัน (เฉลี่ยใช้ {{ avg }}/วัน)</div>
+                        <div class="small mt-1">คงเหลือ {{ cur_stock }} ชิ้น</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Trend comparison -->
+            <div class="row g-3">
+                <div class="col-12"><p class="fw-bold text-muted small mb-2">📈 Trend เปรียบเทียบ 30 วันล่าสุด vs 30 วันก่อนหน้า</p></div>
+                {% for name, new_val, old_val in [
+                    ('Base', forecast.trend.new_base, forecast.trend.old_base),
+                    ('Lid', forecast.trend.new_lid, forecast.trend.old_lid),
+                    ('Collar', forecast.trend.new_collar, forecast.trend.old_collar)
+                ] %}
+                <div class="col-md-4">
+                    <div class="stat-pill">
+                        <div class="fw-bold">{{ name }}</div>
+                        <div class="small text-muted">30 วันล่าสุด: <strong>{{ new_val }}/วัน</strong></div>
+                        <div class="small text-muted">30 วันก่อน: <strong>{{ old_val }}/วัน</strong></div>
+                        {% set diff = (new_val|float - old_val|float) %}
+                        {% if diff > 0 %}
+                        <div class="trend-up small"><i class="bi bi-arrow-up"></i> เพิ่มขึ้น {{ "%.1f"|format(diff) }}/วัน</div>
+                        {% elif diff < 0 %}
+                        <div class="trend-down small"><i class="bi bi-arrow-down"></i> ลดลง {{ "%.1f"|format(diff|abs) }}/วัน</div>
+                        {% else %}
+                        <div class="small text-muted">— คงที่</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Top Countries -->
+        <div class="col-lg-5">
+            <div class="ceva-card h-100">
+                <div class="card-header"><i class="bi bi-trophy-fill me-2 text-warning"></i>Top 10 ประเทศ / ลูกค้า (เบิกออก)</div>
+                <div class="card-body p-3" style="height:340px"><canvas id="topChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Monthly Summary -->
+        <div class="col-lg-7">
+            <div class="ceva-card h-100">
+                <div class="card-header"><i class="bi bi-calendar3 me-2"></i>สรุปรายเดือน (12 เดือนล่าสุด)</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height:340px;overflow-y:auto">
+                        <table class="table table-hover align-middle small mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr><th>เดือน</th><th class="text-end">IN Base</th><th class="text-end">OUT Base</th><th class="text-end">IN Lid</th><th class="text-end">OUT Lid</th><th class="text-end">IN Collar</th><th class="text-end">OUT Collar</th><th class="text-end">รายการ</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for m in monthly %}
+                                <tr>
+                                    <td class="fw-bold">{{ m.month }}</td>
+                                    <td class="text-end text-primary">{{ m.in_base }}</td>
+                                    <td class="text-end text-danger">{{ m.out_base }}</td>
+                                    <td class="text-end text-primary">{{ m.in_lid }}</td>
+                                    <td class="text-end text-danger">{{ m.out_lid }}</td>
+                                    <td class="text-end text-primary">{{ m.in_collar }}</td>
+                                    <td class="text-end text-danger">{{ m.out_collar }}</td>
+                                    <td class="text-end text-muted">{{ m.tx_count }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+new Chart(document.getElementById('topChart'), {
+    type: 'bar',
+    data: {
+        labels: [{% for c in top_countries %}'{{ c.country }}'{% if not loop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+            label: 'Base OUT',
+            data: [{% for c in top_countries %}{{ c.base }}{% if not loop.last %},{% endif %}{% endfor %}],
+            backgroundColor: '#001a4c', borderRadius: 4
+        },{
+            label: 'Collar OUT',
+            data: [{% for c in top_countries %}{{ c.collar }}{% if not loop.last %},{% endif %}{% endfor %}],
+            backgroundColor: '#e60000', borderRadius: 4
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } }
+    }
+});
+</script>
+
+<script>
+(function() {
+    const TIMEOUT_MS = 30 * 60 * 1000;
+    let timer, warnTimer;
+    function resetTimer() {
+        clearTimeout(timer); clearTimeout(warnTimer);
+        warnTimer = setTimeout(() => {
+            if (confirm('คุณไม่ได้ใช้งาน 25 นาทีแล้ว ต้องการใช้งานต่อไหม?')) resetTimer();
+            else window.location.href = '/logout';
+        }, 25 * 60 * 1000);
+        timer = setTimeout(() => {
+            alert('หมดเวลาการใช้งาน กรุณา Login ใหม่');
+            window.location.href = '/logout';
+        }, TIMEOUT_MS);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(e =>
+        document.addEventListener(e, resetTimer, { passive: true }));
+    resetTimer();
+})();
+</script>
+</body>
+</html>
