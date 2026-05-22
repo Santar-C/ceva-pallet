@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8"><title>Import Excel | CEVA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root{--ceva-blue:#001a4c;--ceva-red:#e60000;--bg-gray:#f4f7fa}
+        body{font-family:'Prompt',sans-serif;background:var(--bg-gray)}
+        .sidebar{width:260px;height:100vh;position:fixed;background:var(--ceva-blue);color:white;padding-top:20px;z-index:1000}
+        .main-content{margin-left:260px;padding:30px 40px;min-height:100vh}
+        .sidebar-logo{text-align:center;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.1)}
+        .sidebar-logo img{background:white;padding:8px 12px;border-radius:8px;width:80%}
+        .nav-link{color:rgba(255,255,255,0.7);padding:12px 25px;font-weight:500;transition:all 0.3s}
+        .nav-link.active{color:white;background:var(--ceva-red);border-left:4px solid white}
+        .nav-link:hover{color:white;background:rgba(255,255,255,0.05);padding-left:32px}
+        .user-panel{position:absolute;bottom:0;width:100%;padding:20px;background:rgba(0,0,0,0.2)}
+        .ceva-card{background:white;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.04);margin-bottom:25px}
+        .card-header{background:white;border-bottom:1px solid #edf2f9;padding:18px 25px;font-weight:600;color:var(--ceva-blue);border-radius:12px 12px 0 0}
+        .drop-zone{border:2px dashed #cbd5e1;border-radius:12px;padding:50px;text-align:center;cursor:pointer;transition:0.3s;background:#f8fafc}
+        .drop-zone:hover,.drop-zone.dragover{border-color:var(--ceva-blue);background:#eff6ff}
+        .btn-import{background:var(--ceva-blue);color:white;border:none;border-radius:8px;padding:12px 30px;font-weight:600;font-size:1rem;transition:0.3s;width:100%}
+        .btn-import:hover{background:#002a7a;transform:translateY(-2px)}
+        .col-tag{background:#e0f2fe;color:#0369a1;border-radius:4px;padding:2px 8px;font-size:0.8rem;font-weight:600;display:inline-block;margin:2px}
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="sidebar-logo"><img src="{{ url_for('static', filename='logo.png') }}"></div>
+    <div class="nav flex-column mt-3">
+        <a href="{{ url_for('index') }}" class="nav-link"><i class="bi bi-pencil-square me-2"></i>บันทึก & ประวัติ</a>
+        <a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-bar-chart-line-fill me-2"></i>สถิติ & กราฟ</a>
+        <a href="{{ url_for('reports') }}" class="nav-link"><i class="bi bi-file-earmark-bar-graph me-2"></i>รายงานละเอียด</a>
+        <a href="{{ url_for('kpi') }}" class="nav-link"><i class="bi bi-speedometer2 me-2"></i>KPI Dashboard</a>
+        <a href="{{ url_for('import_excel') }}" class="nav-link active"><i class="bi bi-file-earmark-arrow-up me-2"></i>Import Excel</a>
+        <a href="{{ url_for('master_data') }}" class="nav-link"><i class="bi bi-database-fill-gear me-2"></i>ฐานข้อมูลหลัก</a>
+        <a href="{{ url_for('manage_users') }}" class="nav-link"><i class="bi bi-people-fill me-2"></i>จัดการผู้ใช้งาน</a>
+        <a href="{{ url_for('admin_clear') }}" class="nav-link"><i class="bi bi-trash3-fill me-2"></i>ล้างข้อมูล</a>
+        <a href="{{ url_for('audit_log') }}" class="nav-link"><i class="bi bi-shield-check me-2"></i>Audit Log</a>
+    </div>
+    <div class="user-panel">
+        <div class="fw-bold d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-person-circle me-2"></i>{{ session.username }}</span>
+            <a href="{{ url_for('logout') }}" class="text-white"><i class="bi bi-box-arrow-right"></i></a>
+        </div>
+    </div>
+</div>
+
+<div class="main-content">
+    <h3 class="fw-bold text-dark mb-3"><i class="bi bi-file-earmark-arrow-up me-2 text-success"></i>Import Excel — นำเข้าข้อมูล</h3>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for cat, msg in messages %}
+    <div class="alert alert-{{ 'success' if cat == 'success' else 'danger' }}"><i class="bi bi-info-circle-fill me-2"></i>{{ msg }}</div>
+    {% endfor %}{% endif %}{% endwith %}
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="ceva-card">
+                <div class="card-header"><i class="bi bi-upload me-2"></i>อัปโหลดไฟล์ Excel</div>
+                <div class="card-body p-4">
+                    <form method="POST" enctype="multipart/form-data" id="importForm">
+                        <div class="drop-zone mb-4" id="dropZone" onclick="document.getElementById('excel_file').click()">
+                            <i class="bi bi-file-earmark-excel text-success" style="font-size:3rem"></i>
+                            <div class="fw-bold mt-3" id="fileLabel">คลิกหรือลากไฟล์ Excel มาวางที่นี่</div>
+                            <div class="text-muted small mt-1">รองรับ .xlsx และ .xls</div>
+                            <input type="file" name="excel_file" id="excel_file" accept=".xlsx,.xls" class="d-none" required onchange="showFile(this)">
+                        </div>
+                        <div class="alert alert-warning p-3 small mb-4">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            ไฟล์ที่ Import ต้องเป็น Excel ที่ Export จากระบบนี้เท่านั้น หัวคอลัมน์ต้องครบทุกคอลัมน์
+                        </div>
+                        <button type="submit" class="btn-import" onclick="return confirm('ยืนยันนำเข้าข้อมูล? รายการที่มีอยู่แล้วจะไม่ถูกลบ')">
+                            <i class="bi bi-cloud-upload me-2"></i>นำเข้าข้อมูล
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="ceva-card">
+                <div class="card-header"><i class="bi bi-info-circle me-2"></i>คำแนะนำการใช้งาน</div>
+                <div class="card-body p-4">
+                    <p class="fw-bold text-muted small mb-2">หัวคอลัมน์ที่ต้องมีในไฟล์ Excel:</p>
+                    <div class="mb-3">
+                        {% for col in ['ประเภท','เอกสาร','ประเทศ','PO','Set','Base','Lid','Collar','ผู้ทำรายการ','เวลา'] %}
+                        <span class="col-tag">{{ col }}</span>
+                        {% endfor %}
+                    </div>
+                    <hr>
+                    <p class="fw-bold small mb-2">ขั้นตอน Archive + Import คืน:</p>
+                    <ol class="small text-muted ps-3">
+                        <li class="mb-1">กด <strong>Export Excel</strong> เก็บไฟล์ไว้</li>
+                        <li class="mb-1">Admin <strong>ล้างข้อมูลเก่า</strong> ในหน้า "ล้างข้อมูล"</li>
+                        <li class="mb-1">ถ้าต้องการดูข้อมูลเก่า ให้ <strong>Import Excel</strong> คืนที่นี่</li>
+                        <li class="mb-1">ข้อมูลจะกลับมาครบ ฐานข้อมูลพร้อมใช้อีกครั้ง</li>
+                    </ol>
+                    <hr>
+                    <div class="text-center">
+                        <div class="text-muted small">รายการในระบบตอนนี้</div>
+                        <div style="font-size:2rem;font-weight:700;color:var(--ceva-blue)">{{ total }}</div>
+                        <div class="text-muted small">รายการ</div>
+                        <a href="{{ url_for('export_excel') }}" class="btn btn-success btn-sm mt-2 w-100">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Export Excel ก่อน Import
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f) { document.getElementById('excel_file').files = e.dataTransfer.files; showFile({files:[f]}); }
+});
+function showFile(inp) {
+    const f = inp.files[0];
+    if (f) document.getElementById('fileLabel').innerHTML = '<strong class="text-success">✅ ' + f.name + '</strong>';
+}
+</script>
+
+<script>
+(function() {
+    const TIMEOUT_MS = 30 * 60 * 1000;
+    let timer, warnTimer;
+    function resetTimer() {
+        clearTimeout(timer); clearTimeout(warnTimer);
+        warnTimer = setTimeout(() => {
+            if (confirm('คุณไม่ได้ใช้งาน 25 นาทีแล้ว ต้องการใช้งานต่อไหม?')) resetTimer();
+            else window.location.href = '/logout';
+        }, 25 * 60 * 1000);
+        timer = setTimeout(() => {
+            alert('หมดเวลาการใช้งาน กรุณา Login ใหม่');
+            window.location.href = '/logout';
+        }, TIMEOUT_MS);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(e =>
+        document.addEventListener(e, resetTimer, { passive: true }));
+    resetTimer();
+})();
+</script>
+</body>
+</html>
