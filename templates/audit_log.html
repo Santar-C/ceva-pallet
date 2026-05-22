@@ -81,5 +81,26 @@ $(document).ready(function(){
     $('#auditTable').DataTable({order:[[0,'desc']],language:{search:"🔍 ค้นหา:",lengthMenu:"แสดง _MENU_ แถว",info:"_START_-_END_ จาก _TOTAL_",paginate:{next:"ถัดไป",previous:"ก่อนหน้า"}}});
 });
 </script>
+
+<script>
+(function() {
+    const TIMEOUT_MS = 30 * 60 * 1000;
+    let timer, warnTimer;
+    function resetTimer() {
+        clearTimeout(timer); clearTimeout(warnTimer);
+        warnTimer = setTimeout(() => {
+            if (confirm('คุณไม่ได้ใช้งาน 25 นาทีแล้ว ต้องการใช้งานต่อไหม?')) resetTimer();
+            else window.location.href = '/logout';
+        }, 25 * 60 * 1000);
+        timer = setTimeout(() => {
+            alert('หมดเวลาการใช้งาน กรุณา Login ใหม่');
+            window.location.href = '/logout';
+        }, TIMEOUT_MS);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(e =>
+        document.addEventListener(e, resetTimer, { passive: true }));
+    resetTimer();
+})();
+</script>
 </body>
 </html>
