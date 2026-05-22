@@ -463,16 +463,176 @@ def export_excel():
         as_attachment=True, download_name=f'CEVA_Pallet_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx')
 
 
-@app.route('/run-migrate-secret-ceva2024')
-def run_migration():
-    try:
-        conn = get_db(); cur = conn.cursor()
-        cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS note TEXT DEFAULT ''")
-        cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS po_number INTEGER DEFAULT 0")
-        conn.commit(); cur.close(); conn.close()
-        return "<h2>✅ Migration สำเร็จ! ปิดหน้านี้แล้วกลับใช้งานได้เลย</h2>"
-    except Exception as e:
-        return f"<h2>❌ Error: {e}</h2>"
+
+# ==================== IMPORT EXCEL ====================
+@app.route('/import_excel', methods=['GET', 'POST'])
+def import_excel():
+    if 'username' not in session: return redirect(url_for('login'))
+    if session.get('role') != 'admin': flash("เฉพาะ Admin!", "error"); return redirect(url_for('index'))
+    if request.method == 'POST':
+        f = request.files.get('excel_file')
+        if not f or not f.filename.endswith(('.xlsx','.xls')):
+            flash("กรุณาเลือกไฟล์ Excel (.xlsx/.xls)", "error")
+            return redirect(url_for('import_excel'))
+        try:
+            from openpyxl import load_workbook
+            wb = load_workbook(f, data_only=True)
+            ws = wb.active
+            headers = [str(c.value).strip() if c.value else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
+            col = {h: i for i, h in enumerate(headers)}
+            required = ['ประเภท','เอกสาร','ประเทศ','PO','Set','Base','Lid','Collar','ผู้ทำรายการ','เวลา']
+            missing = [r for r in required if r not in col]
+            if missing:
+                flash(f"ไม่พบคอลัมน์: {', '.join(missing)}", "error")
+                return redirect(url_for('import_excel'))
+            conn = get_db(); cur = conn.cursor()
+            count = 0
+            errors = []
+            for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                try:
+                    tx_type    = 'IN' if str(row[col['ประเภท']]) in ['IN','รับเข้า'] else 'OUT'
+                    doc_number = str(row[col['เอกสาร']] or '').strip().upper()
+                    country    = str(row[col['ประเทศ']] or '').strip()
+                    po_number  = int(row[col['PO']] or 0)
+                    quantity   = int(row[col['Set']] or 0)
+                    base_qty   = int(row[col['Base']] or 0)
+                    lid_qty    = int(row[col['Lid']] or 0)
+                    collar_qty = int(row[col['Collar']] or 0)
+                    user_name  = str(row[col['ผู้ทำรายการ']] or session['username']).strip()
+                    ts_raw     = row[col['เวลา']]
+                    if isinstance(ts_raw, datetime):
+                        ts = ts_raw
+                    elif ts_raw:
+                        ts = datetime.strptime(str(ts_raw)[:16], '%Y-%m-%d %H:%M')
+                    else:
+                        ts = datetime.now()
+                    if not doc_number or not country: continue
+                    cur.execute("""INSERT INTO transactions
+                        (tx_type,doc_number,country,po_number,quantity,base_qty,lid_qty,collar_qty,user_name,timestamp)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (tx_type,doc_number,country,po_number,quantity,base_qty,lid_qty,collar_qty,user_name,ts))
+                    count += 1
+                except Exception as e:
+                    errors.append(f"แถว {i}: {e}")
+            conn.commit(); cur.close(); conn.close()
+            log_audit('IMPORT', f"Imported {count} records from Excel", session['username'])
+            msg = f"นำเข้าสำเร็จ {count} รายการ"
+            if errors: msg += f" (ข้ามไป {len(errors)} แถว)"
+            flash(msg, "success")
+        except Exception as e:
+            flash(f"ข้อผิดพลาด: {e}", "error")
+        return redirect(url_for('import_excel'))
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM transactions"); total = cur.fetchone()[0]
+    cur.close(); conn.close()
+    return render_template('import_excel.html', total=total)
+
+# ==================== REPORTS ====================
+@app.route('/reports')
+def reports():
+    if 'username' not in session: return redirect(url_for('login'))
+    conn = get_db(); cur = conn.cursor()
+
+    # Monthly summary
+    cur.execute("""
+        SELECT TO_CHAR(timestamp,'YYYY-MM') AS month,
+            SUM(CASE WHEN tx_type='IN'  THEN base_qty   ELSE 0 END) AS in_base,
+            SUM(CASE WHEN tx_type='OUT' THEN base_qty   ELSE 0 END) AS out_base,
+            SUM(CASE WHEN tx_type='IN'  THEN lid_qty    ELSE 0 END) AS in_lid,
+            SUM(CASE WHEN tx_type='OUT' THEN lid_qty    ELSE 0 END) AS out_lid,
+            SUM(CASE WHEN tx_type='IN'  THEN collar_qty ELSE 0 END) AS in_collar,
+            SUM(CASE WHEN tx_type='OUT' THEN collar_qty ELSE 0 END) AS out_collar,
+            COUNT(*) AS tx_count
+        FROM transactions GROUP BY month ORDER BY month DESC LIMIT 12""")
+    monthly = dict_fetchall(cur)
+
+    # Top countries OUT
+    cur.execute("""
+        SELECT country,
+            SUM(base_qty) AS base, SUM(lid_qty) AS lid, SUM(collar_qty) AS collar,
+            COUNT(*) AS tx_count
+        FROM transactions WHERE tx_type='OUT'
+        GROUP BY country ORDER BY base DESC LIMIT 10""")
+    top_countries = dict_fetchall(cur)
+
+    # Forecast: avg daily OUT last 30 days
+    cur.execute("""
+        SELECT
+            ROUND(SUM(base_qty)::numeric   / GREATEST(COUNT(DISTINCT DATE(timestamp)),1), 2) AS avg_base,
+            ROUND(SUM(lid_qty)::numeric    / GREATEST(COUNT(DISTINCT DATE(timestamp)),1), 2) AS avg_lid,
+            ROUND(SUM(collar_qty)::numeric / GREATEST(COUNT(DISTINCT DATE(timestamp)),1), 2) AS avg_collar
+        FROM transactions
+        WHERE tx_type='OUT' AND timestamp >= NOW() - INTERVAL '30 days'""")
+    avg30 = dict_fetchone(cur) or {'avg_base':0,'avg_lid':0,'avg_collar':0}
+
+    # Forecast: trend (last 30 vs prev 30)
+    cur.execute("""
+        SELECT
+            ROUND(SUM(CASE WHEN timestamp >= NOW()-INTERVAL'30 days' THEN base_qty   ELSE 0 END)::numeric/30,2) AS new_base,
+            ROUND(SUM(CASE WHEN timestamp <  NOW()-INTERVAL'30 days' AND timestamp >= NOW()-INTERVAL'60 days' THEN base_qty ELSE 0 END)::numeric/30,2) AS old_base,
+            ROUND(SUM(CASE WHEN timestamp >= NOW()-INTERVAL'30 days' THEN lid_qty    ELSE 0 END)::numeric/30,2) AS new_lid,
+            ROUND(SUM(CASE WHEN timestamp <  NOW()-INTERVAL'30 days' AND timestamp >= NOW()-INTERVAL'60 days' THEN lid_qty  ELSE 0 END)::numeric/30,2) AS old_lid,
+            ROUND(SUM(CASE WHEN timestamp >= NOW()-INTERVAL'30 days' THEN collar_qty ELSE 0 END)::numeric/30,2) AS new_collar,
+            ROUND(SUM(CASE WHEN timestamp <  NOW()-INTERVAL'30 days' AND timestamp >= NOW()-INTERVAL'60 days' THEN collar_qty ELSE 0 END)::numeric/30,2) AS old_collar
+        FROM transactions WHERE tx_type='OUT'""")
+    trend = dict_fetchone(cur) or {}
+
+    stock = get_stock_data()
+    cur.close(); conn.close()
+
+    def days_left(stock_val, avg):
+        try:
+            avg = float(avg) if avg else 0
+            return round(float(stock_val) / avg) if avg > 0 else 999
+        except: return 999
+
+    forecast = {
+        'base_days':   days_left(stock['total_base'],   avg30['avg_base']),
+        'lid_days':    days_left(stock['total_lid'],    avg30['avg_lid']),
+        'collar_days': days_left(stock['total_collar'], avg30['avg_collar']),
+        'avg30': avg30, 'trend': trend
+    }
+
+    return render_template('reports.html',
+        monthly=monthly, top_countries=top_countries,
+        forecast=forecast, stock=stock, alerts=get_alerts())
+
+# ==================== KPI ====================
+@app.route('/kpi')
+def kpi():
+    if 'username' not in session: return redirect(url_for('login'))
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT COUNT(*) AS total_tx,
+            SUM(CASE WHEN tx_type='IN'  THEN 1 ELSE 0 END) AS total_in,
+            SUM(CASE WHEN tx_type='OUT' THEN 1 ELSE 0 END) AS total_out,
+            SUM(CASE WHEN DATE_TRUNC('month',timestamp)=DATE_TRUNC('month',NOW()) THEN 1 ELSE 0 END) AS this_month,
+            COUNT(DISTINCT user_name) AS active_users,
+            COUNT(DISTINCT country) AS countries_served
+        FROM transactions""")
+    kpi_data = dict_fetchone(cur)
+    cur.execute("""
+        SELECT TO_CHAR(timestamp,'YYYY-MM-DD') AS day, COUNT(*) AS cnt
+        FROM transactions
+        WHERE timestamp >= NOW() - INTERVAL '14 days'
+        GROUP BY day ORDER BY day""")
+    daily = dict_fetchall(cur)
+    cur.execute("""
+        SELECT user_name, COUNT(*) AS cnt
+        FROM transactions GROUP BY user_name ORDER BY cnt DESC LIMIT 5""")
+    top_users = dict_fetchall(cur)
+    cur.close(); conn.close()
+    return render_template('kpi.html', kpi=kpi_data, daily=daily,
+        top_users=top_users, stock=get_stock_data(), alerts=get_alerts())
+
+# ==================== AUTO LOGOUT CONFIG ====================
+@app.route('/set_session_timeout', methods=['POST'])
+def set_session_timeout():
+    if session.get('role') != 'admin': return redirect(url_for('index'))
+    minutes = int(request.form.get('timeout_minutes', 30))
+    session['timeout_minutes'] = minutes
+    flash(f"ตั้งค่า Auto Logout {minutes} นาทีแล้ว", "success")
+    return redirect(url_for('manage_users'))
 
 with app.app_context():
     init_db()
