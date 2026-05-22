@@ -38,7 +38,10 @@
     <div class="nav flex-column mt-3">
         <a href="{{ url_for('index') }}" class="nav-link active"><i class="bi bi-pencil-square me-2"></i>บันทึก & ประวัติ</a>
         <a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-bar-chart-line-fill me-2"></i>สถิติ & กราฟ</a>
+        <a href="{{ url_for('reports') }}" class="nav-link"><i class="bi bi-file-earmark-bar-graph me-2"></i>รายงานละเอียด</a>
+        <a href="{{ url_for('kpi') }}" class="nav-link"><i class="bi bi-speedometer2 me-2"></i>KPI Dashboard</a>
         {% if session.role == 'admin' %}
+        <a href="{{ url_for('import_excel') }}" class="nav-link"><i class="bi bi-file-earmark-arrow-up me-2"></i>Import Excel</a>
         <a href="{{ url_for('master_data') }}" class="nav-link"><i class="bi bi-database-fill-gear me-2"></i>ฐานข้อมูลหลัก</a>
         <a href="{{ url_for('manage_users') }}" class="nav-link"><i class="bi bi-people-fill me-2"></i>จัดการผู้ใช้งาน</a>
         <a href="{{ url_for('admin_clear') }}" class="nav-link"><i class="bi bi-trash3-fill me-2"></i>ล้างข้อมูล</a>
@@ -271,6 +274,38 @@ function toggleItem(item){
     else{inp.disabled=false;}
 }
 calcIN();
+</script>
+
+<script>
+// Auto Logout เมื่อไม่ได้ใช้งาน 30 นาที
+(function() {
+    const TIMEOUT_MS = 30 * 60 * 1000;
+    let timer;
+    function resetTimer() {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            alert('หมดเวลาการใช้งาน กรุณา Login ใหม่');
+            window.location.href = '/logout';
+        }, TIMEOUT_MS);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(e => 
+        document.addEventListener(e, resetTimer, { passive: true })
+    );
+    resetTimer();
+    // Warning at 25 min
+    let warnTimer;
+    function resetWarn() {
+        clearTimeout(warnTimer);
+        warnTimer = setTimeout(() => {
+            if (confirm('คุณไม่ได้ใช้งาน 25 นาทีแล้ว ต้องการใช้งานต่อไหม?')) resetTimer();
+            else window.location.href = '/logout';
+        }, 25 * 60 * 1000);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(e =>
+        document.addEventListener(e, resetWarn, { passive: true })
+    );
+    resetWarn();
+})();
 </script>
 </body>
 </html>
