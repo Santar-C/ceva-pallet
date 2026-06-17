@@ -256,16 +256,21 @@ def process_transaction():
         user_name  = session['username']
 
         if tx_type == 'IN':
-            # รับเข้า: ยังคิดเป็น Set (Base=1xQty, Lid=1xQty, Collar=POxQty)
-            calc_base   = quantity
-            calc_lid    = quantity
-            calc_collar = po_number * quantity
+            if po_number == 0:
+                # P00: รับเข้าเฉพาะ Base เท่านั้น
+                calc_base   = quantity
+                calc_lid    = 0
+                calc_collar = 0
+            else:
+                # P01+: Base=Qty, Lid=Qty, Collar=PO×Qty
+                calc_base   = quantity
+                calc_lid    = quantity
+                calc_collar = po_number * quantity
         else:
             # เบิกออก: กรอกแยกอิสระแต่ละชิ้น
             calc_base   = int(request.form.get('base_qty', 0))
             calc_lid    = int(request.form.get('lid_qty', 0))
             calc_collar = int(request.form.get('collar_qty', 0))
-
         if tx_type == 'OUT':
             current = get_stock_data()
             errors = []
