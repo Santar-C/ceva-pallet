@@ -251,13 +251,13 @@ def process_transaction():
         tx_type    = request.form['tx_type']
         doc_number = request.form['doc_number'].strip().upper()
         country    = request.form['country'].strip()
-        po_number  = int(request.form.get('po_number', 0))
-        quantity   = int(request.form.get('quantity', 0))
+        po_number  = int(request.form.get('po_number') or 0)   # แก้: or 0 รองรับ field ว่าง
+        quantity   = int(request.form.get('quantity') or 0)    # แก้: or 0 รองรับ field ว่าง
         user_name  = session['username']
 
         if tx_type == 'IN':
             if po_number == 0:
-                # P00: รับเข้าเฉพาะ Base เท่านั้น
+                # P00: รับเข้าเฉพาะ Base เท่านั้น ไม่มี Lid / Collar
                 calc_base   = quantity
                 calc_lid    = 0
                 calc_collar = 0
@@ -268,9 +268,10 @@ def process_transaction():
                 calc_collar = po_number * quantity
         else:
             # เบิกออก: กรอกแยกอิสระแต่ละชิ้น
-            calc_base   = int(request.form.get('base_qty', 0))
-            calc_lid    = int(request.form.get('lid_qty', 0))
-            calc_collar = int(request.form.get('collar_qty', 0))
+            calc_base   = int(request.form.get('base_qty') or 0)    # แก้: or 0
+            calc_lid    = int(request.form.get('lid_qty') or 0)     # แก้: or 0
+            calc_collar = int(request.form.get('collar_qty') or 0)  # แก้: or 0
+
         if tx_type == 'OUT':
             current = get_stock_data()
             errors = []
@@ -380,7 +381,6 @@ def audit_log():
     logs = dict_fetchall(cur); cur.close(); conn.close()
     return render_template('audit_log.html', logs=logs)
 
-
 # ==================== EDIT TRANSACTION (Admin) ====================
 @app.route('/edit/<int:tx_id>', methods=['GET', 'POST'])
 def edit_tx(tx_id):
@@ -391,11 +391,11 @@ def edit_tx(tx_id):
         tx_type    = request.form['tx_type']
         doc_number = request.form['doc_number'].strip().upper()
         country    = request.form['country'].strip()
-        po_number  = int(request.form.get('po_number', 0))
-        quantity   = int(request.form.get('quantity', 0))
-        base_qty   = int(request.form.get('base_qty', 0))
-        lid_qty    = int(request.form.get('lid_qty', 0))
-        collar_qty = int(request.form.get('collar_qty', 0))
+        po_number  = int(request.form.get('po_number') or 0)
+        quantity   = int(request.form.get('quantity') or 0)
+        base_qty   = int(request.form.get('base_qty') or 0)
+        lid_qty    = int(request.form.get('lid_qty') or 0)
+        collar_qty = int(request.form.get('collar_qty') or 0)
         tx_date    = request.form.get('tx_date', '')
         try:
             tx_timestamp = datetime.strptime(tx_date, '%Y-%m-%dT%H:%M') if tx_date else datetime.now()
@@ -466,8 +466,6 @@ def export_excel():
     return send_file(output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True, download_name=f'CEVA_Pallet_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx')
-
-
 
 # ==================== IMPORT EXCEL ====================
 @app.route('/import_excel', methods=['GET', 'POST'])
