@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CEVA Logistics Asset Management</title>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Libre+Caslon+Text:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: "Plus Jakarta Sans", sans-serif; background-color: #fbf9f4; }
+        .font-serif { font-family: "Libre Caslon Text", serif; }
+    </style>
+</head>
+<body class="flex min-h-screen text-[#1b1c19]">
+
+    <aside class="w-64 bg-[#f5f3ee] border-r border-gray-200 p-6 flex flex-col fixed h-screen">
+        <div class="flex items-center gap-3 mb-8">
+            <div class="w-9 h-9 rounded-xl bg-[#061b0e] flex items-center justify-center text-white font-serif text-lg font-bold">C</div>
+            <div>
+                <h2 class="text-xs font-extrabold tracking-wider text-[#061b0e] uppercase">CEVA Logistics</h2>
+                <p class="text-[10px] text-gray-500">Asset Management</p>
+            </div>
+        </div>
+
+        <nav class="flex-1 space-y-1">
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="w-full text-left py-2.5 px-4 text-xs font-bold rounded-xl bg-[#061b0e] text-white transition-all">📊 Dashboard</button>
+            <button onclick="switchTab('inventory')" id="btn-inventory" class="w-full text-left py-2.5 px-4 text-xs font-semibold text-gray-600 hover:bg-gray-200/50 rounded-xl transition-all">📦 Inventory Stock</button>
+            <button onclick="switchTab('history')" id="btn-history" class="w-full text-left py-2.5 px-4 text-xs font-semibold text-gray-600 hover:bg-gray-200/50 rounded-xl transition-all">📜 History Logs</button>
+        </nav>
+
+        <div class="mt-auto">
+            <button onclick="openModal()" class="w-full bg-[#061b0e] text-white py-2.5 rounded-full text-xs font-bold hover:opacity-90 transition-all mb-4">
+                ➕ LEND / RECEIVE SEEDS
+            </button>
+            <p class="text-[9px] text-center text-gray-400 italic">จัดทำเพื่อหาค่าอาหารให้ข้าวตูและกะปิ</p>
+        </div>
+    </aside>
+
+    <main class="flex-1 pl-64 flex flex-col">
+        <header class="h-16 border-b border-gray-200 px-8 flex items-center bg-white/50 backdrop-blur-md">
+            <span class="text-xs font-bold text-gray-800 uppercase tracking-wider" id="page-title">Dashboard Overview</span>
+        </header>
+
+        <div class="p-8 max-w-7xl w-full mx-auto flex-1">
+            
+            <div id="panel-dashboard" class="tab-panel space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                        <p class="text-[10px] uppercase font-bold text-gray-400">Total Tx Logs</p>
+                        <p class="font-serif text-2xl font-bold text-[#061b0e] mt-1">{{ kpi.total_loans if kpi else 0 }}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                        <p class="text-[10px] uppercase font-bold text-gray-400">Active Channels</p>
+                        <p class="font-serif text-2xl font-bold text-[#061b0e] mt-1">{{ kpi.countries_served if kpi else 0 }} Hubs</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                        <p class="text-[10px] uppercase font-bold text-gray-400">Total Inbound</p>
+                        <p class="font-serif text-2xl font-bold text-green-700 mt-1">{{ kpi.total_in if kpi else 0 }}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                        <p class="text-[10px] uppercase font-bold text-gray-400">Total Outbound</p>
+                        <p class="font-serif text-2xl font-bold text-red-700 mt-1">{{ kpi.total_out if kpi else 0 }}</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                        <h4 class="font-serif text-sm font-bold mb-3">Recent 14-Day Density Logs</h4>
+                        <div class="space-y-2 max-h-48 overflow-y-auto">
+                            {% for row in daily %}
+                            <div class="flex justify-between text-xs py-1.5 border-b border-gray-100 font-mono">
+                                <span>{{ row.day }}</span> <span class="font-bold text-[#061b0e]">{{ row.cnt }} Tasks</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                        <h4 class="font-serif text-sm font-bold mb-3">Operator Frequency (Top 5)</h4>
+                        <div class="space-y-2">
+                            {% for row in top_users %}
+                            <div class="flex justify-between text-xs py-1.5 border-b border-gray-100">
+                                <span>👤 {{ row.user_name }}</span> <span class="font-mono bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded font-bold">{{ row.cnt }} Actions</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-inventory" class="tab-panel space-y-6 hidden">
+                <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                    <h3 class="font-serif text-base font-bold text-[#061b0e] mb-4">Real-Time Core Asset Stock Quantities</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-gray-100 uppercase text-[10px] text-gray-500">
+                                <tr>
+                                    <th class="p-4">Variety / Site Location</th>
+                                    <th class="p-4 text-center">Available Base</th>
+                                    <th class="p-4 text-center">Available Lid</th>
+                                    <th class="p-4 text-center">Available Collar</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 font-mono font-bold">
+                                {% for row in stock %}
+                                <tr class="hover:bg-gray-50/80">
+                                    <td class="p-4 font-sans">{{ row.variety_name }}</td>
+                                    <td class="p-4 text-center text-blue-900">{{ row.available_base }}</td>
+                                    <td class="p-4 text-center text-purple-900">{{ row.available_lid }}</td>
+                                    <td class="p-4 text-center text-amber-900">{{ row.available_collar }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-history" class="tab-panel hidden">
+                <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                    <h3 class="font-serif text-base font-bold text-[#061b0e] mb-4">Immutable Transaction Audit Trails</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-gray-100 font-sans uppercase text-[10px] text-gray-500">
+                                <tr>
+                                    <th class="p-3">Timestamp</th>
+                                    <th class="p-3">Type</th>
+                                    <th class="p-3">Doc Ref</th>
+                                    <th class="p-3">Hub Site</th>
+                                    <th class="p-3 text-center">Base</th>
+                                    <th class="p-3 text-center">Lid</th>
+                                    <th class="p-3 text-center">Collar</th>
+                                    <th class="p-3 text-center">QR Tracking</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                {% for log in log_rows %}
+                                <tr class="hover:bg-gray-50/80 font-medium">
+                                    <td class="p-3 text-gray-400 text-[11px]">{{ log.timestamp }}</td>
+                                    <td class="p-3 font-sans">
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if log.tx_type == 'IN' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">{{ log.tx_type }}</span>
+                                    </td>
+                                    <td class="p-3 font-sans font-bold">{{ log.doc_number }}</td>
+                                    <td class="p-3 font-sans">{{ log.country }}</td>
+                                    <td class="p-3 text-center">{{ log.base_qty }}</td>
+                                    <td class="p-3 text-center">{{ log.lid_qty }}</td>
+                                    <td class="p-3 text-center">{{ log.collar_qty }}</td>
+                                    <td class="p-3 text-center font-sans">
+                                        <a href="{{ url_for('generate_qr', doc_number=log.doc_number) }}" target="_blank" class="text-xs text-emerald-800 underline font-bold">View QR</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <div id="modal-tx" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-serif text-base font-bold">Log New Inventory Action</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-black font-bold">✕</button>
+            </div>
+            <form action="{{ url_for('add_transaction') }}" method="POST" class="space-y-4 text-xs font-semibold">
+                <div>
+                    <label class="block text-gray-500 mb-1">Direction Type</label>
+                    <select name="tx_type" id="select-tx-type" onchange="toggleFormInputs()" class="w-full p-2 bg-gray-100 rounded-xl">
+                        <option value="IN">IN (Receive Batches via PO Multiplier)</option>
+                        <option value="OUT">OUT (Manual Isolated Items Cut-off)</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-gray-500 mb-1">Doc Identifier Number</label>
+                        <input type="text" name="doc_number" placeholder="CEVA-5021" class="w-full p-2 bg-gray-100 rounded-xl font-mono" required>
+                    </div>
+                    <div>
+                        <label class="block text-gray-500 mb-1">Hub Site / Country</label>
+                        <input type="text" name="country" placeholder="Thailand" class="w-full p-2 bg-gray-100 rounded-xl" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-gray-500 mb-1">Set Batch Volume (Quantity)</label>
+                    <input type="number" name="quantity" min="1" value="1" class="w-full p-2 bg-gray-100 rounded-xl font-mono font-bold" required>
+                </div>
+
+                <div id="box-inbound" class="p-3 bg-green-50 rounded-xl border border-green-100 space-y-1">
+                    <label class="block text-[10px] text-green-900 uppercase">PO Multiplier Code (po_number)</label>
+                    <input type="number" name="po_number" value="0" class="w-full p-2 bg-white border rounded-lg font-mono">
+                    <p class="text-[9px] text-gray-500 font-normal leading-tight">สูตรการคิดสต็อก: Base = Qty, Lid = Qty, Collar = PO × Qty</p>
+                </div>
+
+                <div id="box-outbound" class="hidden p-3 bg-red-50 rounded-xl border border-red-100 space-y-2">
+                    <p class="text-[10px] text-red-900 uppercase">Manual Items Cut-off</p>
+                    <div class="grid grid-cols-3 gap-2 font-mono text-center">
+                        <div><label class="text-[9px] block mb-0.5">Base Qty</label><input type="number" name="base_qty" value="0" class="w-full p-1.5 bg-white border rounded-lg text-center font-bold"></div>
+                        <div><label class="text-[9px] block mb-0.5">Lid Qty</label><input type="number" name="lid_qty" value="0" class="w-full p-1.5 bg-white border rounded-lg text-center font-bold"></div>
+                        <div><label class="text-[9px] block mb-0.5">Collar Qty</label><input type="number" name="collar_qty" value="0" class="w-full p-1.5 bg-white border rounded-lg text-center font-bold"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-[#061b0e] text-white py-3 rounded-full text-xs font-bold shadow-md hover:opacity-90">COMMIT TRANS DATA TO DB</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabId) {
+            // ซ่อนทุกหน้าบานแผงควบคุม
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+            // แสดงหน้าแผงควบคุมที่ต้องการ
+            document.getElementById('panel-' + tabId).classList.remove('hidden');
+
+            // เปลี่ยนสีปุ่มเมนูให้รู้ว่าอยู่หน้าไหน
+            document.querySelectorAll('aside nav button').forEach(b => {
+                b.className = "w-full text-left py-2.5 px-4 text-xs font-semibold text-gray-600 hover:bg-gray-200/50 rounded-xl transition-all";
+            });
+            document.getElementById('btn-' + tabId).className = "w-full text-left py-2.5 px-4 text-xs font-bold rounded-xl bg-[#061b0e] text-white transition-all";
+            
+            // เปลี่ยนหัวข้อหน้าด้านบน
+            document.getElementById('page-title').innerText = tabId.toUpperCase() + ' OVERVIEW';
+        }
+
+        function openModal() { document.getElementById('modal-tx').classList.remove('hidden'); }
+        function closeModal() { document.getElementById('modal-tx').classList.add('hidden'); }
+
+        function toggleFormInputs() {
+            var type = document.getElementById('select-tx-type').value;
+            if(type === 'IN') {
+                document.getElementById('box-inbound').classList.remove('hidden');
+                document.getElementById('box-outbound').classList.add('hidden');
+            } else {
+                document.getElementById('box-inbound').classList.add('hidden');
+                document.getElementById('box-outbound').classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
